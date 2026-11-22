@@ -9,10 +9,10 @@
 #include <thread>
 #include <algorithm>
 #include <string>
-#include "RTSPWrapper/DfcMediaStruct.hpp"
-#include "RTSPWrapper/DfcMediaContext.hpp"
-#include "RTSPWrapper/DfcMediaProvider.hpp"
-#include "RTSPWrapper/DfcMediaRTSPServer.hpp"
+#include "RTSPWrapper/MediaStruct.hpp"
+#include "RTSPWrapper/MediaContext.hpp"
+#include "RTSPWrapper/MediaProvider.hpp"
+#include "RTSPWrapper/MediaRTSPServer.hpp"
 
 using namespace MediaRTSPWorkSpace;
 
@@ -24,7 +24,7 @@ std::string to_lower(std::string str) {
 }
 
 int main(int argc, char *argv[]) {
-    DfcMediaContext context;
+    MediaContext context;
     context.Init();
     context.StartStream();
     context.StartServiceThread();
@@ -35,10 +35,10 @@ int main(int argc, char *argv[]) {
             server.StartStream();
         } else if (input == 't' || input == 'T') {
             server.TerminateStream();
-        } else if (input == 'i' || input == 'I') {
-            server.SwitchFormat("ir");
-        } else if (input == 'c' || input == 'C') {
-            server.SwitchFormat("color");
+        } else if (input == 'v' || input == 'V') {
+            server.SwitchFormat("H264");
+        } else if (input == 'j' || input == 'J') {
+            server.SwitchFormat("JPEG");
         } else if (input == 'q' || input == 'Q') {
             std::cout << "Quitting" << std::endl;
             break;
@@ -49,30 +49,27 @@ int main(int argc, char *argv[]) {
             std::cin >> username;
             std::cout << "Enter password: ";
             std::cin >> password;
-            std::cout << "Changing authentication to " << username << ":" << password << std::endl;
+            std::cout << "Changing authentication for user " << username << std::endl;
             server.ChangeAuthenticate(username, password);
         }
         else if (input == 'p' || input == 'P') {
-            std::string sourcetype, element, property;
-            int value;
-            std::cout << "Enter sourcetype: ";
-            std::cin >> sourcetype;
-            std::cout << "Enter element: ";
+            std::string element, property, value;
+            std::cout << "Enter element (encoder_h264 / encoder_jpeg): ";
             std::cin >> element;
             std::cout << "Enter property: ";
             std::cin >> property;
             std::cout << "Enter value: ";
             std::cin >> value;
-            std::pair<std::string, int> pair_property_value = std::make_pair(property, value);
-            server.SetProperty(sourcetype, element, {pair_property_value});
+            server.SetProperty(element, property, value);
         }
         else if (input == 'h' || input == 'H') {
             std::cout << "Commands:" << std::endl;
             std::cout << "s/S: Start Stream" << std::endl;
             std::cout << "t/T: Terminate Stream" << std::endl;
-            std::cout << "i/I: Switch to IR stream" << std::endl;
-            std::cout << "c/C: Switch to Color stream" << std::endl;
+            std::cout << "v/V: Switch to H264" << std::endl;
+            std::cout << "j/J: Switch to JPEG" << std::endl;
             std::cout << "u/U: Change Authentication" << std::endl;
+            std::cout << "p/P: Set Encoder Property (e.g. encoder_h264 bitrate 2048)" << std::endl;
             std::cout << "q/Q: Quit" << std::endl;
         }
     }

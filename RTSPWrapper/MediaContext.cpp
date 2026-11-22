@@ -3,35 +3,30 @@
 
 using namespace MediaRTSPWorkSpace;
 
-void DfcMediaContext::Init() {
+void MediaContext::Init() {
     /* start serving */
     gst_init(NULL, NULL);
-    _context = std::make_shared<DfcMediaSharedData>();
+    _context = std::make_shared<MediaSharedData>();
     _provider.Init(_context);
-    if (_context->_data_for_ir == nullptr) {
-        printf(" DfcMediaContext Warning: There is not buffer for ir\n");
-    }
-    if (_context->_data_for_color == nullptr) {
-        printf("DfcMediaContext Warning: There is not buffer for color\n");
-    }
     _server.Init(_context);
 }
 
-void *DfcMediaContext::ThreadRunning() {
+void *MediaContext::ThreadRunning() {
     loop = g_main_loop_new(NULL, FALSE);
     
     g_main_loop_run(loop);
 };
 
-void DfcMediaContext::StartServiceThread() {
-    pthread_create(&this->thread_running, NULL, (THREADFUNCPTR)&DfcMediaContext::ThreadRunning, this);
+void MediaContext::StartServiceThread() {
+    std::thread t1(&MediaContext::ThreadRunning, this);
+    t1.detach();
 }
 
-void DfcMediaContext::Terminate() {
+void MediaContext::Terminate() {
     g_main_loop_quit(loop);
 }
 
-void DfcMediaContext::StartStream() {
+void MediaContext::StartStream() {
     _provider.StartStream();
     _server.StartStream();
 }

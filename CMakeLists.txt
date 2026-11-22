@@ -4,7 +4,6 @@ project(RTSPServer VERSION 0.1.0 LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g")
-add_subdirectory(MetaDataPayload)
 
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(GSTREAMER REQUIRED gstreamer-1.0)
@@ -22,6 +21,22 @@ file(GLOB SrcFiles
 )
 
 add_executable(RTSPServer ${SrcFiles})
+
+include(FetchContent)
+FetchContent_Declare(
+  magic_enum
+  GIT_REPOSITORY https://github.com/Neargye/magic_enum.git
+  GIT_TAG v0.9.6
+)
+FetchContent_MakeAvailable(magic_enum)
+
+target_link_libraries(${PROJECT_NAME} PRIVATE magic_enum::magic_enum)
+
+add_subdirectory(MetaDataPayload)
+
+# rtponvifmetapay is built here but not installed; let the server load it from the build tree.
+add_dependencies(${PROJECT_NAME} gstrtponvif)
+target_compile_definitions(${PROJECT_NAME} PRIVATE ONVIF_PLUGIN_FILE="$<TARGET_FILE:gstrtponvif>")
 
 target_include_directories(${PROJECT_NAME} PRIVATE
                                             ${GSTREAMER_INCLUDE_DIRS}

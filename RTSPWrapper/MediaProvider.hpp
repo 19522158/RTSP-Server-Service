@@ -11,18 +11,17 @@
 #include <thread>
 
 namespace MediaRTSPWorkSpace {
-class DfcMediaProvider {
+class MediaProvider {
   public:
-    DfcMediaProvider() = default;
-    ~DfcMediaProvider() = default;
-    void Init(std::shared_ptr<DfcMediaSharedData> context);
+    MediaProvider() = default;
+    ~MediaProvider() = default;
+    void Init(std::shared_ptr<MediaSharedData> context);
     void StartStream();
     void Terminate();
 
-    std::shared_ptr<DfcMediaSharedData> _context;
+    std::shared_ptr<MediaSharedData> _context;
   private:
-    GstElement *_pipelines_color;
-    GstElement *_pipelines_ir;
+    GstElement *_pipelines;
 
   protected:
 };

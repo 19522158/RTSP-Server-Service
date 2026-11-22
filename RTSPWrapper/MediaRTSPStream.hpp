@@ -1,55 +1,97 @@
 #pragma once
 #include "MediaStruct.hpp"
-#include <chrono>
-#include <fstream>
-#include <gst/app/app.h>
-#include <gst/gst.h>
 #include <gst/rtsp-server/rtsp-server.h>
-#include <iostream>
+#include <magic_enum/magic_enum.hpp>
 #include <memory>
-#include <pthread.h>
-#include <thread>
-#include <utility>
-#include <any>
-#include <vector>
+#include <mutex>
+#include <optional>
 #include <string>
+#include <vector>
 
 namespace MediaRTSPWorkSpace {
-class DfcMediaRTSPStream {
-    private:
-        GstRTSPMediaFactory *_factory {nullptr};
-        bool _isH264{false};
-        std::string _source_type {};
-        std::shared_ptr<DfcMediaSharedData> _context {nullptr};
-        GstClockTime timestamp;
-        GstRTSPMedia *_media {nullptr};
-    public:
-        DfcMediaRTSPStream() = default;
-        ~DfcMediaRTSPStream() = default;
-        DfcMediaRTSPStream(const bool isH264 = false, std::string source_type = "color", std::shared_ptr<DfcMediaSharedData> context = nullptr) {
-            _isH264 = isH264;
-            _source_type = source_type;
-            _context = context;
-        }
-        void SetupFactory();
-        void ReleaseFactory();
-        void SwitchFormat();
-        void SetRoleForAuthenticate(const std::string username = "");
-        static void media_configure(GstRTSPMediaFactory *factory, GstRTSPMedia *media, gpointer user_data);
-        static gboolean push_data(GstElement *appsrc, guint unsued, gpointer unused);
-        static void need_data(GstElement *appsrc, guint unused, gpointer user_data);
-        GstRTSPMediaFactory *GetFactory() {
-            return _factory;
-        }
-        bool GetType() {
-            return _isH264;
-        }
-        std::string GetSourceType() {
-            return _source_type;
-        }
-        std::shared_ptr<DfcMediaSharedData> GetContext() {
-            return _context;
-        }
-        bool ChangePropertyPipeline(const std::string &element, std::vector<std::pair<std::string, std::any>> properties);
+
+enum class StreamFormat {
+    H264,
+    JPEG
 };
+
+inline std::optional<StreamFormat> ParseStreamFormat(const std::string &name) {
+    return magic_enum::enum_cast<StreamFormat>(name, magic_enum::case_insensitive);
 }
+
+inline std::string ToString(StreamFormat format) {
+    return std::string(magic_enum::enum_name(format));
+}
+
+/* RTSP role every authenticated user gets; each stream's factory grants it access. */
+inline constexpr const char *kViewerRole = "viewer";
+
+/* A GObject property on a named element of the RTSP pipeline, e.g.
+ * {"encoder_h264", "bitrate", "2048"}. The value is parsed according to the
+ * property's type, so enums ("ultrafast"), booleans and numbers all work. */
+struct PropertySetting {
+    std::string element;
+    std::string property;
+    std::string value;
+};
+
+/* One mount point: a shared media factory producing a fixed format.
+ *
+ * Switching format means building a new stream (MediaRTSPServer::SwitchFormat
+ * does that). The stream tracks every media pipeline its factory creates,
+ * feeds their appsrcs, and lets go of them when the pipeline is unprepared.
+ *
+ * GStreamer calls back from several threads, so callbacks only hold a
+ * weak_ptr to the stream: once the stream is destroyed they do nothing. */
+class MediaRTSPStream : public std::enable_shared_from_this<MediaRTSPStream> {
+  public:
+    static std::shared_ptr<MediaRTSPStream> Create(StreamFormat format, std::shared_ptr<MediaSharedData> context,
+                                                   std::vector<PropertySetting> properties = {});
+    ~MediaRTSPStream();
+    MediaRTSPStream(const MediaRTSPStream &) = delete;
+    MediaRTSPStream &operator=(const MediaRTSPStream &) = delete;
+
+    StreamFormat GetFormat() const { return _format; }
+    /* Borrowed reference; take your own ref before handing it to the mount points. */
+    GstRTSPMediaFactory *GetFactory() const { return _factory; }
+    /* Properties set so far; pass them on when rebuilding the stream. */
+    std::vector<PropertySetting> GetProperties();
+
+    /* Apply to every running pipeline and remember it for pipelines created later.
+     * Returns false (and remembers nothing) if a running pipeline rejects it. */
+    bool SetProperty(const PropertySetting &setting);
+
+  private:
+    struct ActiveMedia {
+        GstRTSPMedia *media{nullptr};
+        GstElement *videoSrc{nullptr};
+        GstElement *metaSrc{nullptr};
+        gulong unpreparedHandler{0};
+    };
+
+    MediaRTSPStream(StreamFormat format, std::shared_ptr<MediaSharedData> context,
+                    std::vector<PropertySetting> properties);
+    void Setup();
+    std::string LaunchDescription() const;
+    void Attach(GstRTSPMedia *media);
+    void Detach(GstRTSPMedia *media);
+    void Release(ActiveMedia &active);
+    void PushMetadata();
+
+    static void OnMediaConfigure(GstRTSPMediaFactory *factory, GstRTSPMedia *media, gpointer data);
+    static void OnMediaUnprepared(GstRTSPMedia *media, gpointer data);
+    static gboolean OnMetadataTick(gpointer data);
+
+    const StreamFormat _format;
+    const std::shared_ptr<MediaSharedData> _context;
+    bool _withMetadata{false};  // false when rtponvifmetapay is unavailable
+    GstRTSPMediaFactory *_factory{nullptr};
+    gulong _configureHandler{0};
+    guint _metadataTimer{0};
+
+    std::mutex _mutex;  // guards _medias and _properties
+    std::vector<ActiveMedia> _medias;
+    std::vector<PropertySetting> _properties;
+};
+
+} // namespace MediaRTSPWorkSpace

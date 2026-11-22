@@ -12,19 +12,19 @@
 #include "MediaRTSPServer.hpp"
 
 namespace MediaRTSPWorkSpace {
-class DfcMediaContext {
+class MediaContext {
   public:
-    DfcMediaContext() = default;
-    ~DfcMediaContext() = default;
+    MediaContext() = default;
+    ~MediaContext() = default;
     void Init();
     void *ThreadRunning();
     void StartServiceThread();
     void Terminate();
     void StartStream();
 
-    std::shared_ptr<DfcMediaSharedData> _context;
-    DfcMediaProvider _provider;
-    DfcMediaRTSPServer _server;
+    std::shared_ptr<MediaSharedData> _context;
+    MediaProvider _provider;
+    MediaRTSPServer _server;
   
   private:
     GMainLoop *loop;
